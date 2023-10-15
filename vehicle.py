@@ -7,45 +7,19 @@ from typing import List
 from edge import EdgeServer
 import socket, pickle, time
 import sqlite3
-import logging
-from colorlog import ColoredFormatter
-
-
-# Set up the logging handler with a ColoredFormatter
-handler = logging.StreamHandler()
-formatter = ColoredFormatter(
-    "%(log_color)s%(asctime)s - %(levelname)s - %(message)s",
-    datefmt="%H:%M:%S",
-    reset=True,
-    log_colors={
-        'DEBUG': 'cyan',
-        'INFO': 'green',
-        'WARNING': 'yellow',
-        'ERROR': 'red',
-        'CRITICAL': 'red,bg_white',
-    },
-    secondary_log_colors={},
-    style='%'
-)
-handler.setFormatter(formatter)
-
-# Set up the logger with the handler
-logger = logging.getLogger('custom_logger')
-logger.addHandler(handler)
-logger.setLevel(logging.DEBUG)
-
+from logger import *
+import threading
 
 class Vehicle:
     # initializes the vehicle
     def __init__(self, index: int, port: int) -> None:
         self.id: int = index
-        self.distance: int = random.randint(0, 900)  # 600 metres
+        self.distance: int = random.randint(1, 900)  # 600 metres
         self.speed: int = random.randint(50, 150)   # 50km/hr - 150km/hr
 
         self.data: List[int] = [0, 0, 0, 0, 0, 0, 0]
 
         # uses the baseline model
-        self.model: EdgeServer = EdgeServer()
         self.prediction: int = 0
 
         # transmission ports
@@ -67,13 +41,14 @@ class Vehicle:
     
     def train_model(self) -> int:
         # trains the model using the baseline from Edge server and returns the learning summary
+        model: EdgeServer = EdgeServer()
         data = self.data[:6]
 
         # trains the model with the generated dataset
-        summary = self.model.train_each_vehicle(data)
+        summary = model.train_each_vehicle(data)
 
         # makes prediction
-        self.prediction: int = self.model.prediction(data)
+        self.prediction: int = model.prediction(data)
  
         return summary, self.prediction
     
@@ -84,7 +59,7 @@ class Vehicle:
         
         return False
             
-    def create_critical_message(self, dist: List[int]) -> tuple:  
+    def create_critical_message(self) -> tuple:  
         # get the source address
         src = self.id
 
@@ -134,6 +109,37 @@ class Vehicle:
             except socket.error as e:
                 # retry accepting connection after some time
                 time.sleep(0.1)
+
+    def listening(self) -> None:
+        # create a listening port for the switch to communicate with the controller
+        vehicle_address = ('127.0.0.1', self.port)
+        vehicle_sock = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
+        vehicle_sock.bind(vehicle_address)
+
+        vehicle_sock.listen(5)  # listen to a maximum of 5 connections
+        logger.info("Vehicle {self.id} listening on port {self.port}")
+
+        while True:
+            # Accept incoming connection
+            sock, address = vehicle_sock.accept()
+            logger.info(f"Accepted connection from {address}: {sock}")
+        
+            # Start a new thread to handle the client
+            handler = threading.Thread(target=self.handle_switch, args=(sock,))
+            self.handle_controller.start()
+
+    def handle_switch(self, sock) -> None:
+        # listen to the controller in background
+        while True:
+            # Receive data from the client
+            data = sock.recv(1024)
+            if not data:
+                # If no data is received, the client has closed the connection
+                logger.error(f'Lost connection to port {sock}')
+                break
+            # Process the received data
+            pkt: List = pickle.loads(data)
+            logger.info(f'Action Received')
             
     def save_dataset(self) -> None:
         # saves each vehicle's dataset to the database

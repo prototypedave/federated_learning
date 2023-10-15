@@ -93,7 +93,7 @@ def speed_data(speed: int) -> int:
         spd = 2
     elif speed > 80:
         spd = 1
-    elif speed > 50:
+    elif speed >= 50:
         spd = 0
     else:
         raise OverflowError(f'Speed out of bounds')
@@ -128,8 +128,35 @@ def generate_data():
         
     return [obstacles, weather, speed, distance, road_condition, time, risk_severity]
 
-def get_node_address(dist: List[int], pos: int):
+def get_node_address(dist: List[int], pos: int) -> tuple:
     closest_value = min(dist, key=lambda x: abs(x - pos))
     for idx in dist:
         if idx == closest_value:
             return idx, closest_value
+        
+def calculate_bandwidth(qos: float) -> int:
+    # calculates bandwidth based on the value of qos
+    bandwidth: int = 5
+    # high
+    if qos > 107: 
+        bandwidth = random.randint(100, 200)
+    elif qos > 54:
+        bandwidth = random.randint(20, 100)
+    else:
+        bandwidth = random.randint(5, 20)
+    return bandwidth
+
+def calculate_bitrate(speed: int, distance: int) -> int:
+    # assume 100mbs is to be contended for each switch
+    bitrate: int = (100 * speed) % distance
+    return bitrate
+
+def calculate_num_antennas(dist: int) -> int:
+    num: int = 0
+    if dist > 50:
+        num = 3
+    elif dist > 25:
+        num = 2
+    else:
+        num = 1
+    return num
