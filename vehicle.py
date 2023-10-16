@@ -25,7 +25,6 @@ class Vehicle:
         # transmission ports
         self.port = port
 
-
     def get_environment_data(self, obstacles: str, weather: str, r_condition: str, tim: str) -> None:
         # convert the values of the data into integer
         obs = obstacles_data(obstacles=obstacles)
@@ -59,7 +58,7 @@ class Vehicle:
         
         return False
             
-    def create_critical_message(self) -> tuple:  
+    def create_critical_message(self, dist: List) -> tuple:  
         # get the source address
         src = self.id
 
@@ -79,16 +78,16 @@ class Vehicle:
     
         return message
     
-    def send(self, port: int) -> None:
+    def send(self, port: int, msg: tuple) -> None:
         # start the socket for transmission
-        sock = socket(socket.AF_INET, socket.SOCK_STREAM)
-        sock.connect(('127.0.0.1', port))
+        sock = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
+        sock.connect(('0.0.0.0', port))
 
         # convert data into bytes
-        data = pickle.dumps(self.data)
+        data = pickle.dumps(msg)
         sock.send(data)
 
-        logger.info("Vehicle {self.id} just sent csm to Switch at port {port}")
+        logger.info(f"Vehicle {self.id} just sent csm to Switch at port {port}")
         sock.close()
 
     def receive_action(self) -> None:
@@ -117,7 +116,7 @@ class Vehicle:
         vehicle_sock.bind(vehicle_address)
 
         vehicle_sock.listen(5)  # listen to a maximum of 5 connections
-        logger.info("Vehicle {self.id} listening on port {self.port}")
+        logger.info("Vehicle is open for communication")
 
         while True:
             # Accept incoming connection

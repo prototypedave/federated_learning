@@ -6,9 +6,10 @@
 from vehicle import Vehicle
 from typing import List
 from switch import GnbSwitch
-import random
+import random,threading
 from logger import logger
 from controller import SdnController
+from funcs import get_node_address
 
 
 class Network:
@@ -16,9 +17,10 @@ class Network:
         # store the vehicles instances in a list
         self.vehicles: List[Vehicle] = []
         self.switches: List[GnbSwitch] = []
-        self.v_port = 12345
-        self.s_port = 54321
-        self.c_port = 6643
+        self.v_port = 1234
+        self.s_port = 2345
+        self.c_port = 3456
+        self.r_port = 4321
 
         # environment conditions
         self.obstacles: str = ""
@@ -35,10 +37,14 @@ class Network:
         self.get_distance()
 
         # add switches
-        self.get_switches(swch=switch)
+        self.get_switches(swch=switch, vehicles=vehicles)
+
+        # store the distance for the switch
+        self.switch_distance: List[int] = []
+        self.get_switch_distance()
 
         # add controller
-        self.cotroller = SdnController(self.switches, self.vehicles)
+        self.cotroller = SdnController(self.switches, self.vehicles, switch, self.c_port)
 
     def environment_conditions(self) -> None:
         # obstacles
@@ -70,24 +76,66 @@ class Network:
             self.vehicles.append(vehicle)
         logger.info(f'Vehicles : {veh}')
 
-    def get_switches(self, swch) -> None:
+    def get_switches(self, swch, vehicles) -> None:
+        dif: int = int(900 / swch)
+        pos: int = int(dif / 2)
         for id in range(swch):
+            ps = 0
+            if id == 0:
+                ps = pos
+            else:
+                ps = pos + dif * id 
             port = self.s_port + id
-            pos = (900 % swch)    # 900 for max distace, we set the position o the switch on exact intervals
-            if id > 0:
-                pos = pos * id
-            switch = GnbSwitch(idx=id, pos=pos, port=port, controller_port=self.c_port)
-            self.switches.append(switch)
+            pr = self.r_port + id
+            num = int(vehicles / swch)
+            sw = GnbSwitch(idx=id, pos=ps, port=port, controller_port=self.c_port, v_port=pr, num_v=num)
+            self.switches.append(sw)
+
         logger.info(f'Switches : {swch}')
+
+    def get_switch_index(self, distance) -> int:
+        idx, pos = get_node_address(self.switch_distance, distance)
+        return idx, pos
 
     def get_distance(self) -> None:
         for vehicle in self.vehicles:
             dist = vehicle.distance
             self.vehicle_distance.append(dist)
+
+    def get_switch_distance(self) -> None:
+        for switch in self.switches:
+            dist = switch.distance
+            self.switch_distance.append(dist)
         
 if __name__ == '__main__':
     net = Network(100, 10)
-    for swch in net.switches:
-        swch.configure(["p"])   
+    # load the datasets
+    for vehicle in net.vehicles:
+        vehicle.get_environment_data(net.obstacles, net.weather, net.road_data, net.time)
+        # save the dataset in db
+        # vehicle.save_dataset()
+    c_thread = threading.Thread(target=net.cotroller.listen)
+    c_thread.start()
+
+    for swich in net.switches:
+        r_thread = threading.Thread(target=swich.listening_server)
+        r_thread.start()
+
+    # train the vehicle
+    for vehicle in net.vehicles:
+        vehicle.train_model()
+
+        # create csm
+        msg = vehicle.create_critical_message(net.vehicle_distance)
+
+        idx, pos = net.get_switch_index(vehicle.distance)
+        print(idx, pos)
+    
+        port = net.switches[idx].port
+
+        switch_thread = threading.Thread(target=net.switches[idx].listening_to_vehicles)
+        switch_thread.start()
+
+        vehicle.send(port, msg)
 
         

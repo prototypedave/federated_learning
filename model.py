@@ -105,3 +105,6 @@ class AI_Model():
         predicted_label: int = torch.argmax(output).item()
 
         return predicted_label
+
+if __name__ == "__main__":
+    net = AI_Model()

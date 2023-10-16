@@ -7,26 +7,29 @@ from typing import List
 from funcs import *
 
 class SdnController:
-    def __init__(self, switch: List, vehicle: List) -> None:
+    def __init__(self, switch: List, vehicle: List, swich: int, port: int) -> None:
+        logger.info(f"SDN CONTROLLER STARTED")
         self.switches: List = switch
         self.vehicles: List = vehicle
+        self.swich = swich
+        self.port = port
 
+    def listen(self):
         # set up listening port for the controller
-        self.port = 6643
         self.sock = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
         self.sock.bind(('127.0.0.1', self.port))
-        self.sock.listen(5)
+        self.sock.listen(self.swich)
 
-        logger.info("SDN controller listening on port {self.port}")
+        logger.info(f"SDN controller listening on port {self.port}")
 
         while True:
             # Accept incoming connection
             sock, address = self.sock.accept()
-            logger.info(f"Accepted connection from {address}: {sock}")
+            logger.info(f"Sdn accepted connection from {address}")
         
             # Start a new thread to handle the client
-            handler = threading.Thread(target=self.receive_critical_message(), args=(sock,))
-            self.handle_controller.start()
+            handler = threading.Thread(target=self.receive_critical_message, args=(sock,))
+            self.receive_critical_message(sock)
 
     def receive_critical_message(self, sock) -> None:
         while True:
@@ -34,15 +37,16 @@ class SdnController:
             data = sock.recv(1024)
             if not data:
                 # If no data is received, the client has closed the connection
-                logger.error(f'Lost connection to port {sock}')
+                logger.error(f'Sdn Lost connection to port {sock}')
                 break
             # Process the received data
             pkt: List = pickle.loads(data)
-            logger.info(f'critical message received')
+            logger.info(f'Sdn received critical message from Switch')
 
             self.assign_configurations(pkt)
 
     def assign_configurations(self, data: List) -> None:
+        openflow_msg: List = []
         # retrieve data
         if data is not None and len(data) == 5:
             src: int = data[0]
@@ -51,34 +55,46 @@ class SdnController:
             speed: int = data[3]
             distance: int = data[4]
 
+            if distance == 0:
+                distance = 1
+
             # calculate qos
-            qos = sum(risk, speed) / distance
+            qos =  (risk + speed) / distance
 
             # assign destination switch
             switch_port, dist, port2 = self.get_destination_switch(dest)
 
             # get bandwidth
             bandwidth = calculate_bandwidth(qos)
+            openflow_msg.append(bandwidth)
 
             # get bitrate
             bitrate = calculate_bitrate(speed=speed, distance=distance)
+            openflow_msg.append(bitrate)
 
             # get number of antennas
             antenna = calculate_num_antennas(dist=dist)
+            openflow_msg.append(antenna)
 
             # get processor speed
             processor = (qos * 2) / 160    # Assume a limited processor of 2Ghz and a max qos of 160
+            openflow_msg.append(processor)
 
             # get memory
             ram = (qos * 1024) / 160
+            openflow_msg.append(ram)
+
+            openflow_msg.append(port2)
+            openflow_msg.append(dest)
 
             # get action
             action = self.assign_action(qos)
+            openflow_msg.append(action)
 
-            openflow_msg: List = [bandwidth, bitrate, antenna, processor, ram, port2, dest, action]
+            logger.info(f"{openflow_msg}")
             self.send_to_switch(openflow_msg, switch_port)
 
-    def send_to_switch(msg: List, port: int) -> None:
+    def send_to_switch(self, msg: List, port: int) -> None:
         sock = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
         sock.connect(('0.0.0.0', port))
 
@@ -99,7 +115,7 @@ class SdnController:
                 pos1 = vcl.distance
                 port2 = vcl.port
         
-        positions: List = 0
+        positions: List = []
 
         for swch in self.switches:
             pos = swch.distance

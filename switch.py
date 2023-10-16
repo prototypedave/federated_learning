@@ -10,7 +10,7 @@ import threading
 
 
 class GnbSwitch:
-    def __init__(self, idx: int, pos: int, port: int, controller_port: int) -> None:
+    def __init__(self, idx: int, pos: int, port: int, controller_port: int, v_port: int, num_v: int) -> None:
         # initialize this class
         self.index = idx
 
@@ -29,17 +29,44 @@ class GnbSwitch:
         # transmission ports
         self.port: int = port
         self.c_port: int = controller_port
+        self.v_port: int = v_port
 
-    def send_to_controller(self, data: List) -> None:
+        # self number of vehicles to connect to
+        self.num_v: int = num_v
+
+    def send_to_controller(self, data) -> None:
         # start the socket for transmission
         sock = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
         sock.connect(('127.0.0.1', self.c_port))
 
-        # convert data into bytes
-        data = pickle.dumps(data)
         sock.send(data)
         
         sock.close
+
+    def listening_to_vehicles(self) -> None:
+        # create a listening port for the switch to communicate with the vehicle
+        server_address = ('0.0.0.0', self.v_port)
+        server_sock = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
+        server_sock.bind(server_address)
+
+        server_sock.listen(self.num_v)  # listen to a maximum of given connections
+        logger.info(f"switch {self.index} listening on port {self.v_port}")
+
+        while True:
+            # Accept incoming connection
+            sock, address = server_sock.accept()
+            logger.info(f"Switch {self.index} accepted connection from {address}")
+
+            data = sock.recv(1024)
+            if not data:
+                # If no data is received, the client has closed the connection
+                logger.error(f'Switch {self.index} Lost connection to port {address}')
+                break
+
+            # Start a new thread to handle the client
+            handler = threading.Thread(target=self.send_to_controller, args=(data,))
+            logger.info(f"Switch {self.index} just forwarded csm to controller")
+            self.send_to_controller(data)
 
     def configure(self, pkt: List) -> None:
         # catch ivalid packets
@@ -75,17 +102,17 @@ class GnbSwitch:
         server_sock = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
         server_sock.bind(server_address)
 
-        server_sock.listen(5)  # listen to a maximum of 5 connections
-        logger.info("switch {self.index} listening on port {self.port}")
+        server_sock.listen(1)  # listen only on sdn
+        logger.info(f"switch {self.index} listening for SDN controller on port {self.port}")
 
         while True:
             # Accept incoming connection
             sock, address = server_sock.accept()
-            logger.info(f"Accepted connection from {address}: {sock}")
+            logger.info(f"Accepted SDN connection from {address}")
         
             # Start a new thread to handle the client
             handler = threading.Thread(target=self.handle_controller, args=(sock,))
-            self.handle_controller.start()
+            self.handle_controller(sock)
 
     def handle_controller(self, sock) -> None:
         # listen to the controller in background
@@ -98,6 +125,7 @@ class GnbSwitch:
                 break
             # Process the received data
             pkt: List = pickle.loads(data)
+            logger.info(f"{pkt}")
             logger.info(f'openflow configuration message received')
 
             # configure the switch

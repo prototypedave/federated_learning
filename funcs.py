@@ -129,9 +129,13 @@ def generate_data():
     return [obstacles, weather, speed, distance, road_condition, time, risk_severity]
 
 def get_node_address(dist: List[int], pos: int) -> tuple:
+    for ds in dist:
+        if ds == pos:
+            dist.remove(ds)
+            
     closest_value = min(dist, key=lambda x: abs(x - pos))
-    for idx in dist:
-        if idx == closest_value:
+    for idx in range(len(dist)):
+        if dist[idx] == closest_value:
             return idx, closest_value
         
 def calculate_bandwidth(qos: float) -> int:
