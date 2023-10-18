@@ -5,3 +5,7 @@
 /training/
 test.py
 test.csv
+__pycache__
+.gitignore
+federated_model.pth
+learning.db
