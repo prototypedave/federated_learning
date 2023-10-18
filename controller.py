@@ -7,53 +7,58 @@ from typing import List
 from funcs import *
 
 class SdnController:
-    def __init__(self, switch: List, vehicle: List, swich: int, port: int) -> None:
+    def __init__(self, switch: List, vehicle: List, swich: int, port: int, dir: str) -> None:
         logger.info(f"SDN CONTROLLER STARTED")
         self.switches: List = switch
         self.vehicles: List = vehicle
         self.swich = swich
         self.port = port
+        self.stop_flag = False
+        self.dir = dir
 
     def listen(self):
         # set up listening port for the controller
-        self.sock = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
-        self.sock.bind(('127.0.0.1', self.port))
-        self.sock.listen(self.swich)
-
-        logger.info(f"SDN controller listening on port {self.port}")
-
-        while True:
-            # Accept incoming connection
-            sock, address = self.sock.accept()
-            logger.info(f"Sdn accepted connection from {address}")
+        c_sock = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
+        c_sock.bind(('127.0.0.1', self.port))
         
-            # Start a new thread to handle the client
-            handler = threading.Thread(target=self.receive_critical_message, args=(sock,))
-            self.receive_critical_message(sock)
+        while not self.stop_flag:
+            c_sock.listen(100)
+
+            logger.info(f"SDN controller listening on port {self.port}")
+
+            while True:
+                # Accept incoming connection
+                sock, address = c_sock.accept()
+                logger.info(f"Sdn accepted connection from {address}")
+        
+                # Start a new thread to handle the client
+                handler = threading.Thread(target=self.receive_critical_message, args=(sock,))
+                self.receive_critical_message(sock)
+        c_sock.close()
 
     def receive_critical_message(self, sock) -> None:
-        while True:
-            # Receive data from the client
-            data = sock.recv(1024)
-            if not data:
-                # If no data is received, the client has closed the connection
-                logger.error(f'Sdn Lost connection to port {sock}')
-                break
-            # Process the received data
-            pkt: List = pickle.loads(data)
-            logger.info(f'Sdn received critical message from Switch')
+        # Receive data from the client
+        data = sock.recv(1024)
+        if not data:
+            # If no data is received, the client has closed the connection
+            logger.error(f'Sdn Lost connection to port')
+            return
+        # Process the received data
+        pkt: List = pickle.loads(data)
+        logger.info(f'Sdn received critical message from Switch')
 
-            self.assign_configurations(pkt)
+        self.assign_configurations(pkt)
 
     def assign_configurations(self, data: List) -> None:
         openflow_msg: List = []
         # retrieve data
-        if data is not None and len(data) == 5:
+        if data is not None and len(data) == 6:
             src: int = data[0]
             dest: int = data[1]
             risk: int = data[2]
             speed: int = data[3]
             distance: int = data[4]
+            tm = data[5]
 
             if distance == 0:
                 distance = 1
@@ -91,8 +96,33 @@ class SdnController:
             action = self.assign_action(qos)
             openflow_msg.append(action)
 
-            logger.info(f"{openflow_msg}")
+            openflow_msg.append(tm)
+            openflow_msg.append(src)
+            openflow_msg.append(speed)
+            openflow_msg.append(distance)
+
             self.send_to_switch(openflow_msg, switch_port)
+
+            # get overhead
+            overhead = network_overhead(bandwidth=bandwidth, bitrate=bitrate, antennas=antenna)
+            filepath = self.dir + "network_overhead.csv"
+            write_to_csv(filepath=filepath, x=speed, y=overhead)
+
+            # get complexity
+            complexity = computational_complexity(processor=processor, ram=ram)
+            filepath = self.dir + "computational_complexity.csv"
+            write_to_csv(filepath=filepath, x=speed, y=complexity)
+
+            # routing decision
+            filepath = self.dir + "routing_vehicles.csv"
+            write_to_csv(filepath=filepath, x=distance, y=src)
+            filepath = self.dir + "routing_speed.csv"
+            write_to_csv(filepath=filepath, x=distance, y=speed)
+
+            # collision risk
+            c_risk = calculate_collision_risk(distance=distance)
+            filepath = self.dir + "collision_rate.csv"
+            write_to_csv(filepath=filepath, x=speed, y=c_risk)
 
     def send_to_switch(self, msg: List, port: int) -> None:
         sock = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
@@ -101,6 +131,8 @@ class SdnController:
         # convert data into bytes
         data = pickle.dumps(msg)
         sock.send(data)
+
+        logger.info(f"Open flow message sent to switch at port {port}")
         
         sock.close
 

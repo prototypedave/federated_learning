@@ -4,15 +4,13 @@
 
 from funcs import *
 from typing import List
-from edge import EdgeServer
 import socket, pickle, time
 import sqlite3
 from logger import *
-import threading
 
 class Vehicle:
     # initializes the vehicle
-    def __init__(self, index: int, port: int) -> None:
+    def __init__(self, index: int, port: int, dir: str) -> None:
         self.id: int = index
         self.distance: int = random.randint(1, 900)  # 600 metres
         self.speed: int = random.randint(50, 150)   # 50km/hr - 150km/hr
@@ -24,6 +22,12 @@ class Vehicle:
 
         # transmission ports
         self.port = port
+        self.dir = dir
+
+        self.stop_flag: bool = False
+
+        self.received_packet: int = 0
+        self.dropped_packets: int = 0
 
     def get_environment_data(self, obstacles: str, weather: str, r_condition: str, tim: str) -> None:
         # convert the values of the data into integer
@@ -38,13 +42,12 @@ class Vehicle:
         self.data = [obs, wth, spd, dist, rdc, tm, rs]
         
     
-    def train_model(self) -> int:
+    def train_model(self, model) -> int:
         # trains the model using the baseline from Edge server and returns the learning summary
-        model: EdgeServer = EdgeServer()
         data = self.data[:6]
 
         # trains the model with the generated dataset
-        summary = model.train_each_vehicle(data)
+        summary = model.get_prediction(data)
 
         # makes prediction
         self.prediction: int = model.prediction(data)
@@ -74,14 +77,16 @@ class Vehicle:
         # get the risk distance
         rd = abs(pos2 - self.distance)
 
-        message: tuple = (src, dst, rs, vs, rd)
+        start_time = time.time()
+
+        message: tuple = (src, dst, rs, vs, rd, start_time)
     
         return message
     
     def send(self, port: int, msg: tuple) -> None:
         # start the socket for transmission
         sock = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
-        sock.connect(('0.0.0.0', port))
+        sock.connect(('127.0.0.2', port))
 
         # convert data into bytes
         data = pickle.dumps(msg)
@@ -94,51 +99,54 @@ class Vehicle:
         # keeps the socket running
         sock = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
         sock.bind(('127.0.0.1', self.port))
-        sock.listen(1)
-        while True:
-            try:
-                conn, addr = sock.accept()
-                data = conn.recv(1024)
-                pkt = pickle.loads(data)
-                name = self.id
-                print(f"Vehicle {name}: Critical Message Received! Action taken")
+        while not self.stop_flag:
+            sock.listen(100)
+            while True:
+                try:
+                    conn, addr = sock.accept()
+                    data = conn.recv(1024)
+                    pkt = pickle.loads(data)
+                    self.take_action(pkt)
+                    name = self.id
+                    print(f"Vehicle {name}: Critical Message Received! Action taken")
+                    self.received_packet += 1
                 
-                conn.close()
+                    conn.close()
             
-            except socket.error as e:
-                # retry accepting connection after some time
-                time.sleep(0.1)
+                except socket.error as e:
+                    # retry accepting connection after some time
+                    self.dropped_packets += 1
+                    time.sleep(0.1)
 
-    def listening(self) -> None:
-        # create a listening port for the switch to communicate with the controller
-        vehicle_address = ('127.0.0.1', self.port)
-        vehicle_sock = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
-        vehicle_sock.bind(vehicle_address)
+        sock.close()
+        logger.info(f"Vehicle {self.id} disconnected")
 
-        vehicle_sock.listen(5)  # listen to a maximum of 5 connections
-        logger.info("Vehicle is open for communication")
+    def take_action(self, pkt: tuple) -> None:
+        start_time = pkt[2]
+        end_time = time.time()
+        tm = end_time - start_time
+        id = pkt[3]
 
-        while True:
-            # Accept incoming connection
-            sock, address = vehicle_sock.accept()
-            logger.info(f"Accepted connection from {address}: {sock}")
-        
-            # Start a new thread to handle the client
-            handler = threading.Thread(target=self.handle_switch, args=(sock,))
-            self.handle_controller.start()
+        filepath = self.dir + "vehicle_efficiency.csv"
+        write_to_csv(filepath=filepath, x=id, y=tm)
 
-    def handle_switch(self, sock) -> None:
-        # listen to the controller in background
-        while True:
-            # Receive data from the client
-            data = sock.recv(1024)
-            if not data:
-                # If no data is received, the client has closed the connection
-                logger.error(f'Lost connection to port {sock}')
-                break
-            # Process the received data
-            pkt: List = pickle.loads(data)
-            logger.info(f'Action Received')
+        spd = pkt[4]
+        filepath = self.dir + "speed_efficiency.csv"
+        write_to_csv(filepath, spd, tm)
+
+        bwd = pkt[5]
+        filepath = self.dir + "e2edelay5g.csv"
+        write_csv(filepath, bwd, tm, id)
+
+        filepath = self.dir + "e2edelay5gSpeed.csv"
+        write_csv(filepath=filepath, x=bwd, y=tm, z=spd)
+
+        dst = pkt[6]
+        filepath = self.dir + "e2edelayrdveh.csv"
+        write_csv(filepath=filepath, x=dst, y=tm, z=id)
+
+        filepath= self.dir + "e2edelayrdspd.csv"
+        write_csv(filepath=filepath, x=dst, y=tm, z=spd)
             
     def save_dataset(self) -> None:
         # saves each vehicle's dataset to the database

@@ -5,9 +5,10 @@
 from neural import NeuralNetwork
 from db_loader import CustomDataset
 from torch.utils.data import DataLoader
-from funcs import generate_data
+from funcs import generate_data, write_to_csv
 import os, sqlite3, torch
 import torch.optim as optim, torch.nn as nn
+import time
 
 # Load cuda if present
 device = torch.device('cuda' if torch.cuda.is_available() else 'cpu')
@@ -17,6 +18,8 @@ num_epochs = 1000
 class AI_Model():
     def __init__(self) -> None:
         self.model: NeuralNetwork = NeuralNetwork()
+        self.iterate = 0
+    
 
         # load previously pre trained model
         if os.path.exists("federated_model.pth"):    
@@ -30,7 +33,7 @@ class AI_Model():
             self.train()
         else:
             self.create_database()
-    
+
     def create_database(self) -> None:
         # Create the database
         conn = sqlite3.connect("learning.db")
@@ -69,6 +72,9 @@ class AI_Model():
         criterion = nn.CrossEntropyLoss()
         optimizer = optim.Adam(model.parameters(), lr=0.0001)
 
+        start_time = time.time()
+        train_loss_l = []
+
         for epoch in range(num_epochs):
             # train the model
             model.train()
@@ -86,9 +92,38 @@ class AI_Model():
 
                 train_loss += loss.item() * features.size(0)
             train_loss /= len(train_loader.dataset)
+            train_loss_l.append(train_loss)
+        train = sum(train_loss_l) / num_epochs
+        filepath = "results_training/train_loss.csv"
+        write_to_csv(filepath, self.iterate, train)
+
+        end_time = time.time()
+        train_latency = end_time - start_time
+        
+        test_dataset = CustomDataset(self.db_file, "test_data")
+        test_loader = DataLoader(test_dataset, batch_size=32, shuffle=True)
+        model.eval()
+
+        start_time = time.time()
+        test_loss = 0.0
+        for features, labels in test_loader:
+            features, labels = features.to(device), labels.to(device)
+            with torch.no_grad():
+                output = model(features)
+                loss = criterion(output, labels)
+                test_loss += loss.item() * features.size(0)
+            test_loss = test_loss / len(test_loader.dataset)
+        end_time = time.time()
+        test_latency = end_time - start_time
+
+        filepath = "results_training/test_loss.csv"
+        write_to_csv(filepath, self.iterate, test_loss)
+        self.iterate += 1
 
         # Save the trained model
         torch.save(model.state_dict(), 'federated_model.pth')
+
+        return train_latency, test_latency
 
     def predict(self, data) -> int:
         # Convert the input list to a tensor
@@ -105,6 +140,6 @@ class AI_Model():
         predicted_label: int = torch.argmax(output).item()
 
         return predicted_label
-
+    
 if __name__ == "__main__":
     net = AI_Model()

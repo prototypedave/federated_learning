@@ -2,7 +2,7 @@
 
 """ All functions that generate data in the entire system """
 
-import random
+import random, csv
 from typing import List
 
 def calculate_rs(obs, wth, spd, dist, rdc, tm) -> int:
@@ -129,14 +129,20 @@ def generate_data():
     return [obstacles, weather, speed, distance, road_condition, time, risk_severity]
 
 def get_node_address(dist: List[int], pos: int) -> tuple:
-    for ds in dist:
-        if ds == pos:
-            dist.remove(ds)
-            
+    # Remove the pos value from dist if it exists in the list
+    dist = [x for x in dist if x != pos]
+
+    if not dist:
+        # Handle the case where dist becomes empty after removing pos
+        return None, None
+
+    # Find the closest value to pos
     closest_value = min(dist, key=lambda x: abs(x - pos))
-    for idx in range(len(dist)):
-        if dist[idx] == closest_value:
-            return idx, closest_value
+
+    # Find the index of the closest value in the original list
+    closest_index = dist.index(closest_value)
+
+    return closest_index, closest_value
         
 def calculate_bandwidth(qos: float) -> int:
     # calculates bandwidth based on the value of qos
@@ -152,7 +158,7 @@ def calculate_bandwidth(qos: float) -> int:
 
 def calculate_bitrate(speed: int, distance: int) -> int:
     # assume 100mbs is to be contended for each switch
-    bitrate: int = (100 * speed) % distance
+    bitrate: int = int(100 / distance)
     return bitrate
 
 def calculate_num_antennas(dist: int) -> int:
@@ -164,3 +170,49 @@ def calculate_num_antennas(dist: int) -> int:
     else:
         num = 1
     return num
+
+def write_to_csv(filepath, x, y):
+    # Open the file in append mode
+    with open(filepath, 'a', newline='') as file:
+        # Create a CSV writer object
+        writer = csv.writer(file)
+        # Write the updated values to the CSV file
+        writer.writerow([x, y])
+
+def network_overhead(bandwidth: int, bitrate: int, antennas: int):
+    # get the total required resources
+    max_resources: int = 200 + 100 + 5
+    total_resources_used = bandwidth + bitrate + antennas
+    overhead = total_resources_used / max_resources * 100
+    return overhead
+
+def computational_complexity(processor: float, ram: float):
+    # get the total required resources
+    max_resources: int = 2 + 1024
+    total_resources_used = processor + ram
+    complexity = total_resources_used / max_resources * 100
+    return complexity
+
+def calculate_collision_risk(distance: int):
+    dist = max(0, min(distance, 900))
+    risk = 100 - ((distance - 0) / (900 - 0)) * 100
+    return risk
+
+def write_csv(filepath, x, y, z):
+     with open(filepath, 'a', newline='') as file:
+        # Create a CSV writer object
+        writer = csv.writer(file)
+        # Write the updated values to the CSV file
+        writer.writerow([x, y, z])
+
+def find_value_index(value_list, target_number):
+    closest_index = None
+    closest_difference = float('inf') 
+    
+    for index, value in enumerate(value_list):
+        difference = target_number - value
+        if difference >= 0 and difference < closest_difference:
+            closest_difference = difference
+            closest_index = index
+    
+    return closest_index
