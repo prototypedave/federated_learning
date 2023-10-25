@@ -181,14 +181,14 @@ def write_to_csv(filepath, x, y):
 
 def network_overhead(bandwidth: int, bitrate: int, antennas: int):
     # get the total required resources
-    max_resources: int = 200 + 100 + 5
+    max_resources: int = 400 + 236 + 5
     total_resources_used = bandwidth + bitrate + antennas
     overhead = total_resources_used / max_resources * 100
     return overhead
 
 def computational_complexity(processor: float, ram: float):
     # get the total required resources
-    max_resources: int = 2 + 1024
+    max_resources: int = 5 + 2048
     total_resources_used = processor + ram
     complexity = total_resources_used / max_resources * 100
     return complexity

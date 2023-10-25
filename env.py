@@ -20,7 +20,7 @@ RESULTS_DIR = ""
 ####### SCENARIOS #######
 # 100 vehicles
 if DEFAULT:
-    RESULTS_DIR = "training/"
+    RESULTS_DIR = "new/"
 else:
 # 400 vehicles
     RESULTS_DIR = "results_400/"
@@ -148,7 +148,7 @@ if __name__ == "__main__":
         y = "Time (s)"
         title = "Routing Efficiency V Vehicle Density (veh/km)"
         dir = RESULTS_DIR + "routing_efficiency/vehicle_efficiency.png"
-        plot_network_figs(overhead=veh_eff, save=SAVE_PLOTS, dir=dir, title=title, label=label, x=x, y=y, y_lim=None)
+        plot_network_figs_time(overhead=veh_eff, save=SAVE_PLOTS, dir=dir, title=title, label=label, x=x, y=y, y_lim=None)
 
         spd_eff = pd.read_csv((RESULTS_DIR + "speed_efficiency.csv"), header=None)
         spd_eff = spd_eff.groupby(0)[1].mean().reset_index()
@@ -159,7 +159,7 @@ if __name__ == "__main__":
         y = "Time (s)"
         title = "Routing Efficiency V Vehicle Speed (km/hr)"
         dir = RESULTS_DIR + "routing_efficiency/speed_efficiency.png"
-        plot_network_figs(overhead=spd_eff, save=SAVE_PLOTS, dir=dir, title=title, label=label, x=x, y=y, y_lim=None)
+        plot_network_figs_time(overhead=spd_eff, save=SAVE_PLOTS, dir=dir, title=title, label=label, x=x, y=y, y_lim=None)
 
         # Channel utilization
         channel_veh = pd.read_csv((RESULTS_DIR + "v21_vehicles.csv"), header=None, names=['util', 'total', 'veh'])

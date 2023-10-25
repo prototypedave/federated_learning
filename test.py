@@ -1,11 +1,24 @@
-import pandas as pd
+import matplotlib.pyplot as plt
+from mpl_toolkits.mplot3d import Axes3D
 
-if __name__ == '__main__':
-    # Read data from CSV file without headers
-    data = pd.read_csv('test.csv', header=None, names=['time', 'total_time', 'spd'])
 
-    # Group data based on the 'spd' column
-    grouped_data = data.groupby('spd').agg({'time': 'mean', 'total_time': 'mean'}).reset_index()
+if __name__ == "__main__":
+    # Sample data
+    x = [1, 2, 3, 4, 5]
+    y = [5, 6, 7, 8, 9]
+    z = [10, 11, 12, 13, 14]
 
-    # grouped_data now contains the grouped data based on the 'spd' column
-    print(grouped_data)
+    # Create a 3D axis
+    fig = plt.figure()
+    ax = fig.add_subplot(111, projection='3d')
+
+    # Create 3D scatter plot
+    ax.bar(x, y, z)
+
+    # Set labels for each axis
+    ax.set_xlabel('X Label')
+    ax.set_ylabel('Y Label')
+    ax.set_zlabel('Z Label')
+
+    # Show the plot
+    plt.show()

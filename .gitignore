@@ -3,6 +3,7 @@
 /results_training/
 /results_400/
 /training/
+/new/
 test.py
 test.csv
 __pycache__
