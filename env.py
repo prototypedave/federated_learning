@@ -20,7 +20,7 @@ RESULTS_DIR = ""
 ####### SCENARIOS #######
 # 100 vehicles
 if DEFAULT:
-    RESULTS_DIR = "new/"
+    RESULTS_DIR = "results_training/"
 else:
 # 400 vehicles
     RESULTS_DIR = "results_400/"
