@@ -20,7 +20,7 @@ RESULTS_DIR = ""
 ####### SCENARIOS #######
 # 100 vehicles
 if DEFAULT:
-    RESULTS_DIR = "results_training/"
+    RESULTS_DIR = "results/"
 else:
 # 400 vehicles
     RESULTS_DIR = "results_400/"
@@ -49,11 +49,11 @@ if __name__ == "__main__":
 
     if PLOT_ALL:
         ### training and test latency
-        train_lat = pd.read_csv((RESULTS_DIR + "train_latency.csv"), header=None, names=["latency"])
+        train_lat = pd.read_csv(("results_training/train_latency.csv"), header=None, names=["latency"])
         train_lat["Index"] = train_lat.index
         train_lat = train_lat[["Index", "latency"]]
 
-        test_lat = pd.read_csv((RESULTS_DIR + "test_latency.csv"), header=None, names=["latency"])
+        test_lat = pd.read_csv(("results_training/test_latency.csv"), header=None, names=["latency"])
         test_lat["Index"] = test_lat.index
         test_lat = test_lat[["Index", "latency"]]
 
@@ -117,83 +117,117 @@ if __name__ == "__main__":
         dir = RESULTS_DIR + "packet_drop/table.png"
         plot_table(table_data, col, title, dir)
 
+                
+        # collision rate vehicle density
+        coll_veh = pd.read_csv((RESULTS_DIR + "collision_rate_veh.csv"), header=None, names=['veh', 'rate', 'dist'])
+        coll_veh = coll_veh.groupby('dist').agg({'rate': 'mean', 'veh': 'mean'}).reset_index()
+        title = "Collusion rate vs Risk distance Relative to Vehicle Density"
+        plot_risk(col=coll_veh, title=title)
+
+
+        # collision rate speed
+        col_spd = pd.read_csv((RESULTS_DIR + "collision_rate_speed.csv"), header=None, names=['veh', 'rate', 'dist'])
+        col_spd = col_spd.groupby('veh').agg({'rate': 'mean', 'dist': 'mean'}).reset_index()
+        col_spd = col_spd.groupby('dist').agg({'rate': 'mean', 'veh': 'mean'}).reset_index()
+        title = "Collusion rate vs Risk distance Relative to Speed"
+        plot_risk(col=col_spd, title=title)
+
+
+        # Collision rate
+        coll = pd.read_csv((RESULTS_DIR + "collision_rate_speed.csv"), header=None, names=['veh', 'rate', 'dist'])
+        coll = coll.groupby('veh').agg({'rate': 'mean', 'dist': 'mean'}).reset_index()
+        title = "Possible collision V Vehicle Speed (km/hr)"
+        plot(coll, title, "speed", "Possible collision" )
+
+        
         # Routing ratio
-        veh_ratio = pd.read_csv((RESULTS_DIR + "routing_vehicles.csv"), header=None)
+        veh_ratio1 = pd.read_csv((RESULTS_DIR + "routing_vehicles.csv"), header=None, names=['dist', 'veh', 'rate'])
+        veh_ratio = veh_ratio1.groupby('dist').agg({'rate': 'mean', 'veh': 'mean'}).reset_index()
+        title = "Successful routing ratio vs Risk distance Relative to Vehicle Density"
+        plot_risk(veh_ratio, title)
 
-        ##### PLOT ROUTING RATIO V VEHICLE DENSITY #####
-        label = "vehicle routing distribution"
-        x = "Risk Distance (m)"
-        y = "Vehicles Density"
+
+        # Routing ratio nom
         title = "Routing Ratio V Vehicle Density (veh/km)"
-        dir = RESULTS_DIR + "routing_ratio/vehicle_routing.png"
-        plot_network_figs(overhead=veh_ratio, save=SAVE_PLOTS, dir=dir, title=title, label=label, x=x, y=y)
+        plot(veh_ratio1, title, "Vehicles Density", "Successful Routing Ratio")
+        
 
-        spd_ratio = pd.read_csv((RESULTS_DIR + "routing_speed.csv"), header=None)
-        spd_ratio = spd_ratio.groupby(0)[1].mean().reset_index()
+        # Routing ratio speed
+        spd_ratio = pd.read_csv((RESULTS_DIR + "routing_speed.csv"), header=None, names=['dist', 'veh', 'rate'])
+        spd_ratio1 = spd_ratio.groupby('veh').agg({'rate': 'mean', 'dist': 'mean'}).reset_index()
+        spd_ratio = spd_ratio1.groupby('dist').agg({'rate': 'mean', 'veh': 'mean'}).reset_index()
+        title = "Successful routing ratio vs Risk distance Relative to Vehicle Speed"
+        plot_risk(spd_ratio, title)
 
-        ##### PLOT ROUTING RATIO RELATIVE TO SPEED #####
-        label = "speed routing distribution"
-        x = "Risk Distance (m)"
-        y = "Vehicle Speed (km/hr)"
+
+        # Routing ratio speed nom
         title = "Routing Ratio V Vehicle Speed"
-        dir = RESULTS_DIR + "routing_ratio/speed_routing.png"
-        plot_network_figs(overhead=spd_ratio, save=SAVE_PLOTS, dir=dir, title=title, label=label, x=x, y=y, y_lim=150)
+        plot(spd_ratio1, title, "Vehicle Speed (km/hr)", "Successsful Routing Ratio")
+            
 
         # Routing Efficiency
-        veh_eff = pd.read_csv((RESULTS_DIR + "vehicle_efficiency.csv"), header=None)
+        veh_eff1 = pd.read_csv((RESULTS_DIR + "vehicle_efficiency.csv"), header=None, names=['veh', 'rate', 'dist'])
+        veh_eff = veh_eff1.groupby('dist').agg({'rate': 'mean', 'veh': 'mean'}).reset_index()
+        title = "Routing Efficiency vs Risk Distance Relative to Vehicle Density"
+        plot_ratio(veh_eff, title)
 
-        ##### PLOT ROUTING EFFICIENCY V VEHICLE DENSITY #####
-        label = "routing efficiency"
-        x = "Vehicle Density"
-        y = "Time (s)"
+
+        # Routing Efficiency nom
         title = "Routing Efficiency V Vehicle Density (veh/km)"
-        dir = RESULTS_DIR + "routing_efficiency/vehicle_efficiency.png"
-        plot_network_figs_time(overhead=veh_eff, save=SAVE_PLOTS, dir=dir, title=title, label=label, x=x, y=y, y_lim=None)
+        plot(veh_eff1, title, "Vehicle Density", "Time (ms)")
+        
 
-        spd_eff = pd.read_csv((RESULTS_DIR + "speed_efficiency.csv"), header=None)
-        spd_eff = spd_eff.groupby(0)[1].mean().reset_index()
+        #Routing Efficiency Speed
+        spd_eff = pd.read_csv((RESULTS_DIR + "speed_efficiency.csv"), header=None, names=['veh', 'rate', 'dist'])
+        spd_eff1 = spd_eff.groupby('veh').agg({'rate': 'mean', 'dist': 'mean'}).reset_index()
+        spd_eff = spd_eff1.groupby('dist').agg({'rate': 'mean', 'veh': 'mean'}).reset_index()
+        title = "Routing Efficiency vs Risk Distance Relative to Speed"
+        plot_ratio(spd_eff, title)
 
-        ##### PLOT ROUTING EFFICIENCY V VEHICLE DENSITY #####
-        label = "routing efficiency"
-        x = "Vehicle Speed (km/hr)"
-        y = "Time (s)"
-        title = "Routing Efficiency V Vehicle Speed (km/hr)"
-        dir = RESULTS_DIR + "routing_efficiency/speed_efficiency.png"
-        plot_network_figs_time(overhead=spd_eff, save=SAVE_PLOTS, dir=dir, title=title, label=label, x=x, y=y, y_lim=None)
+
+        # Routing efficiency speed nom
+        title = "Routing Efficiency V Vehicle Speed"
+        plot(spd_eff1, title, "Vehicle Speed (km/h)", "Time (ms)")
+        
 
         # Channel utilization
         channel_veh = pd.read_csv((RESULTS_DIR + "v21_vehicles.csv"), header=None, names=['util', 'total', 'veh'])
         channel_veh = channel_veh.groupby('veh').agg({'util': 'mean', 'total': 'mean'}).reset_index()
+        channel_veh = channel_veh.groupby('util').agg({'total': 'mean', 'veh': 'mean'}).reset_index()
+    
+        # trim to be fixed
+        lowerBound = 0.0000
+        upperBound = 0.0004
+        #channel_veh = channel_veh[(channel_veh['total'] >= lowerBound) & (channel_veh['total'] <= upperBound)]
 
         ##### PLOT CHANNEL UTILIZATION #####
         dir = RESULTS_DIR + "/channel_utilization/vehicle.png"
         title = "Channel Utilization Relative to Vehicle Density"
         plot_channel_utilization(df=channel_veh, save=SAVE_PLOTS, dir=dir, title=title)
-
         channel_spd = pd.read_csv((RESULTS_DIR + "v21_speed.csv"), header=None, names=['util', 'total', 'spd'])
         channel_spd = channel_spd.groupby('spd').agg({'util': 'mean', 'total': 'mean'}).reset_index()
 
+        channel_spd = pd.read_csv((RESULTS_DIR + "v21_speed.csv"), header=None, names=['util', 'total', 'spd'])
+        channel_spd = channel_spd.groupby('spd').agg({'util': 'mean', 'total': 'mean'}).reset_index()
+        channel_spd = channel_spd.groupby('util').agg({'total': 'mean', 'spd': 'mean'}).reset_index()
+
+        channel_spd = channel_spd[(channel_spd['total'] >= lowerBound) & (channel_spd['total'] <= upperBound)]
+    
         ##### PLOT CHANNEL UTILIZATION #####
         dir = RESULTS_DIR + "/channel_utilization/speed.png"
         title = "Channel Utilization Relative to Vehicle Speed"
         plot_channel_utilization(df=channel_spd, save=SAVE_PLOTS, dir=dir, title=title)
 
-        # Collision rate
-        coll = pd.read_csv((RESULTS_DIR + "collision_rate.csv"), header=None)
-        coll = coll.groupby(0)[1].mean().reset_index()
-
-        ##### PLOT COLLISION RATE #####
-        label = "collision rate"
-        x = "Vehicle Speed (km/hr)"
-        y = "Rate (%)"
-        title = "Possible collision V Vehicle Speed (km/hr)"
-        dir = RESULTS_DIR + "/collision/rate.png"
-        plot_network_figs(overhead=coll, save=SAVE_PLOTS, dir=dir, title=title, label=label, x=x, y=y, y_lim=None)
+        
+        upp = 7
+        dow = 1
 
         # E2E delay RD
         delay_veh = pd.read_csv((RESULTS_DIR + "e2edelayrdveh.csv"), header=None, names=['util', 'total', 'veh'])
         delay_veh = delay_veh[::10]
         delay_veh = delay_veh.groupby('util').agg({'veh': 'mean', 'total': 'mean'}).reset_index()
+
+        delay_veh = delay_veh[(delay_veh['util'] >= dow) & (delay_veh['util'] <= upp)]
 
         ##### PLOT E2E DELAY #####
         dir = RESULTS_DIR + "/E2E/vehicle_rd.png"
@@ -206,6 +240,8 @@ if __name__ == "__main__":
         delay_spd = delay_spd.groupby('spd').agg({'util': 'mean', 'total': 'mean'}).reset_index()
         delay_spd = delay_spd.groupby('util').agg({'spd': 'mean', 'total': 'mean'}).reset_index()
 
+        delay_spd = delay_spd[(delay_spd['util'] >= dow) & (delay_spd['util'] <= upp)]
+
         ##### PLOT E2E DELAY #####
         dir = RESULTS_DIR + "/E2E/speed_rd.png"
         title = "E2E delay Relative to Vehicle Speed"
@@ -214,25 +250,36 @@ if __name__ == "__main__":
 
         # E2E delay 5G
         delay_veh_5g = pd.read_csv((RESULTS_DIR + "e2edelay5g.csv"), header=None, names=['util', 'total', 'veh'])
-        delay_veh_5g = delay_veh_5g[::10]
+        # delay_veh_5g = delay_veh_5g[::10]
         delay_veh_5g = delay_veh_5g.groupby('util').agg({'veh': 'mean', 'total': 'mean'}).reset_index()
-
 
         ##### PLOT E2E DELAY #####
         dir = RESULTS_DIR + "/E2E/vehicle_5g.png"
         title = "E2E delay (5G range) Relative to Vehicle Density"
-        x = "Transmission range (mhz)"
+        x = "Transmission range (m)"
         plot_delay(df=delay_veh_5g, save=SAVE_PLOTS, title=title, dir=dir, x=x)
-
+    
         # E2E delay 5G Speed
         delay_spd_5g = pd.read_csv((RESULTS_DIR + "e2edelay5gSpeed.csv"), header=None, names=['util', 'total', 'spd'])
         delay_spd_5g = delay_spd_5g.groupby('spd').agg({'util': 'mean', 'total': 'mean'}).reset_index()
         delay_spd_5g = delay_spd_5g.groupby('util').agg({'spd': 'mean', 'total': 'mean'}).reset_index()
 
-
         ##### PLOT E2E DELAY #####
         dir = RESULTS_DIR + "/E2E/speed_5g.png"
         title = "E2E delay (5g range) Relative to Vehicle Speed"
-        x = "Transmission range (mhz)"
+        x = "Transmission range (m)"
         plot_delay(df=delay_spd_5g, save=SAVE_PLOTS, dir=dir, title=title, x=x)
+        
+        
+        # Routing Efficiency v 5G transmission
+        delay_spd_5g = pd.read_csv((RESULTS_DIR + "e2edelay5gSpeed.csv"), header=None, names=['util', 'total', 'spd'])
+        delay_spd_5g = delay_spd_5g.groupby('util').agg({'spd': 'mean', 'total': 'mean'}).reset_index()
+    	
+        ##### Routing Efficiency v 5G transmission #####
+        dir = RESULTS_DIR + "/routing efficiency/5g_efficiency.png"
+        title = "Routing Efficiency v 5G transmission"
+        x = "Transmission range (m)"
+        plot_delay_5(df=delay_spd_5g, save=SAVE_PLOTS, dir=dir, title=title, x=x)
+
+        
 

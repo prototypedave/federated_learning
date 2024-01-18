@@ -13,7 +13,7 @@ class Vehicle:
     def __init__(self, index: int, port: int, dir: str) -> None:
         self.id: int = index
         self.distance: int = random.randint(1, 900)  # 600 metres
-        self.speed: int = random.randint(50, 150)   # 50km/hr - 150km/hr
+        self.speed: int = random.randint(50, 120)   # 50km/hr - 150km/hr
 
         self.data: List[int] = [0, 0, 0, 0, 0, 0, 0]
 
@@ -126,17 +126,21 @@ class Vehicle:
         end_time = time.time()
         tm = end_time - start_time
         id = pkt[3]
+        distance = pkt[6]
 
         filepath = self.dir + "vehicle_efficiency.csv"
-        write_to_csv(filepath=filepath, x=id, y=tm)
+        write_csv(filepath=filepath, x=id, y=tm, z=distance)
 
         spd = pkt[4]
         filepath = self.dir + "speed_efficiency.csv"
-        write_to_csv(filepath, spd, tm)
+        write_csv(filepath, spd, tm, distance)
 
         bwd = pkt[5]
         filepath = self.dir + "e2edelay5g.csv"
         write_csv(filepath, bwd, tm, id)
+        
+        filepath = self.dir + "5g_efficiency.csv"
+        write_to_csv(filepath=filepath, x=bwd, y=tm)
 
         filepath = self.dir + "e2edelay5gSpeed.csv"
         write_csv(filepath=filepath, x=bwd, y=tm, z=spd)

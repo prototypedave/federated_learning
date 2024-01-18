@@ -101,28 +101,39 @@ class SdnController:
             openflow_msg.append(speed)
             openflow_msg.append(distance)
 
-            self.send_to_switch(openflow_msg, switch_port)
-
             # get overhead
             overhead = network_overhead(bandwidth=bandwidth, bitrate=bitrate, antennas=antenna)
             filepath = self.dir + "network_overhead.csv"
             write_to_csv(filepath=filepath, x=speed, y=overhead)
+
+            filepath = self.dir + "overhead_density.csv"
+            write_to_csv(filepath=filepath, x=src, y=overhead)
 
             # get complexity
             complexity = computational_complexity(processor=processor, ram=ram)
             filepath = self.dir + "computational_complexity.csv"
             write_to_csv(filepath=filepath, x=speed, y=complexity)
 
+            filepath = self.dir + "complexity_density.csv"
+            write_to_csv(filepath=filepath, x=src, y=complexity)
+
             # routing decision
+            rat = 100 - ((distance/1000) * 100)
             filepath = self.dir + "routing_vehicles.csv"
-            write_to_csv(filepath=filepath, x=distance, y=src)
+            write_csv(filepath=filepath, x=distance, y=src, z=rat)
             filepath = self.dir + "routing_speed.csv"
-            write_to_csv(filepath=filepath, x=distance, y=speed)
+            write_csv(filepath=filepath, x=distance, y=speed, z=rat)
 
             # collision risk
             c_risk = calculate_collision_risk(distance=distance)
-            filepath = self.dir + "collision_rate.csv"
-            write_to_csv(filepath=filepath, x=speed, y=c_risk)
+            filepath = self.dir + "collision_rate_speed.csv"
+            write_csv(filepath=filepath, x=speed, y=c_risk, z=distance)
+            filepath = self.dir + "collision_rate_veh.csv"
+            write_csv(filepath=filepath, x=src, y=c_risk, z=distance)
+
+            self.send_to_switch(openflow_msg, switch_port)
+
+
 
     def send_to_switch(self, msg: List, port: int) -> None:
         sock = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
