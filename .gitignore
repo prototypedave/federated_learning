@@ -4,6 +4,7 @@
 /results_400/
 /training/
 /new/
+/plots/
 test.py
 test.csv
 __pycache__
